@@ -8,26 +8,39 @@ import (
 	"github.com/go-redis/redis/v7"
 )
 
+type ValueX struct {
+	Name  string
+	Email string
+}
+
 func main() {
-	// rdb := redis.NewClient(&redis.Options{
-	// 	Addr:     "localhost:6379",
-	// 	Password: "",
-	// 	DB:       1,
-	// })
+	rdb, err := initC("localhost:6379")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	key1 := "MyCluster"
+	value1 := &ValueX{Name: "Nam", Email: "nam@gmail.com"}
 
-	// err := rdb.Set("name", "Nam", 0).Err()
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
+	err = rdb.setKey(key1, value1, time.Minute*2)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	value2 := &ValueX{}
+	err = rdb.getKey(key1, value2)
 
-	// val, e := rdb.Get("name").Result()
-	// if e != nil {
-	// 	fmt.Println(e)
-	// 	return
-	// }
-	// fmt.Println(val)
-	redisCluster()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("MyCluster")
+	fmt.Println(value2.Email)
+	// redisCluster()
+}
+
+type redisClient struct {
+	c *redis.Client
 }
 
 type redisCluterClient struct {
@@ -35,30 +48,76 @@ type redisCluterClient struct {
 }
 
 var client = &redisCluterClient{}
+var cl = &redisClient{}
 
 func initCl(addr []string) (*redisCluterClient, error) {
-
 	c := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs: addr,
 	})
 
-	if err := c.Ping().Err(); err != nil {
+	err := c.Ping().Err()
+	if err != nil {
 		return nil, err
 	}
 
 	client.c = c
+
 	return client, nil
+
 }
 
-func (client *redisCluterClient) setKey(key string, value interface{}, expiration time.Duration) error {
+func initC(addr string) (*redisClient, error) {
+	c := redis.NewClient(&redis.Options{
+		Addr: addr,
+	})
 
+	err := c.Ping().Err()
+	if err != nil {
+		return nil, err
+	}
+
+	cl.c = c
+
+	return cl, nil
+
+}
+
+func (cl *redisClient) setKey(key string, value interface{}, expiration time.Duration) error {
 	json, err := json.Marshal(value)
 
 	if err != nil {
 		return err
 	}
 
-	if err = client.c.Set(key, json, expiration).Err(); err != nil {
+	err = cl.c.Set(key, json, expiration).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (client *redisCluterClient) setKey(key string, value interface{}, expiration time.Duration) error {
+	json, err := json.Marshal(value)
+
+	if err != nil {
+		return err
+	}
+
+	err = client.c.Set(key, json, expiration).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cl *redisClient) getKey(key string, src interface{}) error {
+	val, err := cl.c.Get(key).Result()
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal([]byte(val), &src)
+	if err != nil {
 		return err
 	}
 
@@ -66,45 +125,44 @@ func (client *redisCluterClient) setKey(key string, value interface{}, expiratio
 }
 
 func (client *redisCluterClient) getKey(key string, src interface{}) error {
-
 	val, err := client.c.Get(key).Result()
 	if err != nil {
 		return err
 	}
+
 	err = json.Unmarshal([]byte(val), &src)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-type valueEx struct {
-	Name  string
-	Email string
-}
-
 func redisCluster() {
-
 	addr := []string{":7000", ":7001", ":7002", ":7003", ":7004", ":7005"}
-	redisCluterClient, err := initCl(addr)
-	if err != nil {
-		fmt.Println("Error connect: ", err)
-		return
-	}
-	key1 := "myKeyCluster"
-	value1 := &valueEx{Name: "congpv", Email: "congpv@lozi.vn"}
-	err = redisCluterClient.setKey(key1, value1, time.Minute*1)
-	if err != nil {
-		fmt.Printf("Error: %v", err.Error())
-		return
-	}
-	value2 := &valueEx{}
-	err = redisCluterClient.getKey(key1, value2)
-	if err != nil {
-		fmt.Printf("Error: %v", err.Error())
-		return
-	}
 
+	ReCl, err := initCl(addr)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	key1 := "MyCluster"
+	value1 := &ValueX{Name: "Nam", Email: "nam@gmail.com"}
+
+	err = ReCl.setKey(key1, value1, time.Minute*2)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	value2 := &ValueX{}
+	err = ReCl.getKey(key1, value2)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("MyCluster")
 	fmt.Println(value2.Email)
-	fmt.Println(value2.Name)
+
 }
